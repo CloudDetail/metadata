@@ -75,12 +75,6 @@ func (rs *Resources) UpdateResource(res *Resource) {
 	rs.ExportResourceEvents(event)
 }
 
-func (rs *Resources) addResList(res *Resource) {
-	rs.ExportMux.Lock()
-	defer rs.ExportMux.Unlock()
-	rs.ResList = append(rs.ResList, res)
-}
-
 func (rs *Resources) Reset(res []*Resource) {
 	rs.ResList = res
 
@@ -94,7 +88,8 @@ func (rs *Resources) Reset(res []*Resource) {
 }
 
 func (rs *Resources) AddResource(res *Resource) {
-	rs.addResList(res)
+	// 始终检查ResList中是否有相同UID的资源
+	rs.updateResList(res)
 	rs.ExportResourceEvents(&ResourceEvent{
 		ClusterID:    rs.ClusterID,
 		Res:          []*Resource{res},

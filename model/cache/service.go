@@ -13,6 +13,8 @@ var _ resource.ResHandler = &ServiceList{}
 // 如果同时处理Pod资源,会维护Service和Pod的关系
 type ServiceList struct {
 	*resource.Resources
+	// Service UID -> *Service
+	UIDMap sync.Map
 	// Namespace/Name -> *Service
 	ServiceMap sync.Map
 	// IP -> *Service
@@ -74,6 +76,7 @@ func (sl *ServiceList) Reset(resList []*resource.Resource) {
 
 // updateServiceSearch 更新Service资源常规的索引表
 func (sl *ServiceList) updateServiceSearch(service *Service) {
+	sl.UIDMap.Store(service.ResUID, service)
 	sl.ServiceMap.Store(service.NS()+"/"+service.Name, service)
 	sl.IP2ServiceMap.Store(service.IP(), service)
 }
@@ -111,14 +114,14 @@ func (sl *ServiceList) addPod(res *resource.Resource) {
 	psMapRef, find := sl.nsScopePodServiceMap.Load(pod.NS())
 	if !find {
 		podServiceMap := &PodServiceMap{Namespace: pod.NS()}
-		podServiceMap.PodMap.Store(pod.ResUID, pod)
+		podServiceMap.PodUIDMap.Store(pod.ResUID, pod)
 		sl.nsScopePodServiceMap.Store(pod.NS(), podServiceMap)
 		return
 	}
 
 	psMap := psMapRef.(*PodServiceMap)
-	psMap.PodMap.Store(pod.ResUID, pod)
-	psMap.ServiceMap.Range(func(_, serviceRef any) bool {
+	psMap.PodUIDMap.Store(pod.ResUID, pod)
+	psMap.ServiceUIDMap.Range(func(_, serviceRef any) bool {
 		service := serviceRef.(*Service)
 		if service.MatchPod(pod) {
 			service.AddEndpoint(pod)
@@ -140,7 +143,7 @@ func (sl *ServiceList) UpdateResource(res *resource.Resource) {
 			Resource: res,
 		}
 
-		oldServiceRef, find := sl.ServiceMap.Load(service.ResUID)
+		oldServiceRef, find := sl.UIDMap.Load(service.ResUID)
 		if !find {
 			sl.AddResource(res)
 			return
@@ -171,7 +174,7 @@ func (sl *ServiceList) updatePod(res *resource.Resource) {
 			return
 		}
 		psMap := &PodServiceMap{Namespace: pod.NS()}
-		psMap.PodMap.Store(pod.ResUID, pod)
+		psMap.PodUIDMap.Store(pod.ResUID, pod)
 		sl.nsScopePodServiceMap.Store(pod.NS(), psMap)
 		return
 	}
@@ -179,15 +182,15 @@ func (sl *ServiceList) updatePod(res *resource.Resource) {
 	psMap := psMapRef.(*PodServiceMap)
 	var oldPodRef any
 	if pod.Phase() != POD_PHASE_RUNNING {
-		oldPodRef, find = psMap.PodMap.LoadAndDelete(pod.ResUID)
+		oldPodRef, find = psMap.PodUIDMap.LoadAndDelete(pod.ResUID)
 	} else {
-		oldPodRef, find = psMap.PodMap.Swap(pod.ResUID, pod)
+		oldPodRef, find = psMap.PodUIDMap.Swap(pod.ResUID, pod)
 	}
 	if !find {
 		if pod.Phase() != POD_PHASE_RUNNING {
 			return
 		}
-		psMap.ServiceMap.Range(func(_, serviceRef any) bool {
+		psMap.ServiceUIDMap.Range(func(_, serviceRef any) bool {
 			service := serviceRef.(*Service)
 			if service.MatchPod(pod) {
 				service.AddEndpoint(pod)
@@ -201,7 +204,7 @@ func (sl *ServiceList) updatePod(res *resource.Resource) {
 	oldPod := oldPodRef.(*Pod)
 	if oldPod.Phase() == POD_PHASE_RUNNING && pod.Phase() != POD_PHASE_RUNNING {
 		// 查找Pod状态不再有效的Endpoint
-		psMap.ServiceMap.Range(func(_, serviceRef any) bool {
+		psMap.ServiceUIDMap.Range(func(_, serviceRef any) bool {
 			service := serviceRef.(*Service)
 			if service.MatchPod(oldPod) {
 				service.DeleteEndpoint(oldPod)
@@ -225,7 +228,7 @@ func (sl *ServiceList) updatePod(res *resource.Resource) {
 				return
 			}
 		}
-		psMap.ServiceMap.Range(func(_, serviceRef any) bool {
+		psMap.ServiceUIDMap.Range(func(_, serviceRef any) bool {
 			service := serviceRef.(*Service)
 			oldMatch := service.MatchPod(oldPod)
 			if oldMatch && !service.MatchPod(pod) {
@@ -254,12 +257,12 @@ func (sl *ServiceList) DeleteResource(res *resource.Resource) {
 		}
 
 		psMap := psMapRef.(*PodServiceMap)
-		_, find = psMap.PodMap.LoadAndDelete(pod.ResUID)
+		_, find = psMap.PodUIDMap.LoadAndDelete(pod.ResUID)
 		if !find {
 			return
 		}
 
-		psMap.ServiceMap.Range(func(key, serviceRef any) bool {
+		psMap.ServiceUIDMap.Range(func(key, serviceRef any) bool {
 			service := serviceRef.(*Service)
 			if service.MatchPod(pod) {
 				service.DeleteEndpoint(pod)
@@ -279,7 +282,7 @@ func (sl *ServiceList) DeleteResource(res *resource.Resource) {
 			return
 		}
 		psMap := psMapRef.(*PodServiceMap)
-		psMap.ServiceMap.Delete(service.ResUID)
+		psMap.ServiceUIDMap.Delete(service.ResUID)
 	}
 }
 
@@ -305,14 +308,14 @@ func (sl *ServiceList) checkRelation(service *Service) {
 	psMapRef, find := sl.nsScopePodServiceMap.Load(service.NS())
 	if !find {
 		psMap := &PodServiceMap{Namespace: service.NS()}
-		psMap.ServiceMap.Store(service.ResUID, service)
+		psMap.ServiceUIDMap.Store(service.ResUID, service)
 		sl.nsScopePodServiceMap.Store(service.NS(), psMap)
 		return
 	}
 	psMap := psMapRef.(*PodServiceMap)
-	psMap.ServiceMap.Store(service.ResUID, service)
+	psMap.ServiceUIDMap.Store(service.ResUID, service)
 	// 查询现有的Pod中能否匹配服务
-	psMap.PodMap.Range(func(_, podRef any) bool {
+	psMap.PodUIDMap.Range(func(_, podRef any) bool {
 		pod := podRef.(*Pod)
 		if !service.MatchPod(pod) {
 			return true
@@ -403,7 +406,7 @@ func (s *Service) MatchPod(pod *Pod) bool {
 }
 
 type PodServiceMap struct {
-	Namespace  string
-	PodMap     sync.Map
-	ServiceMap sync.Map
+	Namespace     string
+	PodUIDMap     sync.Map
+	ServiceUIDMap sync.Map
 }
