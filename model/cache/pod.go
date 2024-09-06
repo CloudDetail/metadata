@@ -141,7 +141,12 @@ func (p *Pod) NS() string {
 }
 
 func (p *Pod) ContainerIDs() []string {
-	return strings.Split(p.StringAttr[resource.ContainerIDsAttr], ",")
+	containerIds := p.StringAttr[resource.ContainerIDsAttr]
+	if len(containerIds) == 0 {
+		return []string{}
+	}
+
+	return strings.Split(containerIds, ",")
 }
 
 func (p *Pod) PodIP() string {

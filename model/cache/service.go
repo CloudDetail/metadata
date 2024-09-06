@@ -341,7 +341,12 @@ func (s *Service) IP() string {
 }
 
 func (s *Service) EndPoints() []string {
-	return strings.Split(s.StringAttr[resource.ServiceEndpoints], ",")
+	endpoints := s.StringAttr[resource.ServiceEndpoints]
+	if len(endpoints) == 0 {
+		return []string{}
+	}
+
+	return strings.Split(endpoints, ",")
 }
 
 func (s *Service) AddEndpoint(pod *Pod) {
