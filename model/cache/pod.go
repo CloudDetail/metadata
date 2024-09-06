@@ -18,6 +18,7 @@ type PodList struct {
 	// ContainerID -> *Pod
 	ContainerID2Pod sync.Map
 	// IP -> *Pod only store not hostNetwork IP
+	// TODO 重写sync.Map的store方法,丢弃key为空的记录
 	IP2PodMap sync.Map
 }
 
