@@ -53,6 +53,7 @@ func (nl *NodeList) Reset(resList []*resource.Resource) {
 	}
 	nl.IP2Node = newIP2NodeMap
 	nl.UIDMap = newNodeUIDMap
+	nl.Resources.Reset(resList)
 }
 
 func (nl *NodeList) GetNodeByIP(nodeIP string) *Node {

@@ -80,7 +80,9 @@ func (q *Query) QueryResource(w http.ResponseWriter, r *http.Request) {
 }
 
 func (q *Query) GetPodByContainerId(clusterID string, containerId string) (*Pod, bool) {
-	if len(containerId) > 12 {
+	if len(containerId) == 0 {
+		return nil, false
+	} else if len(containerId) > 12 {
 		containerId = containerId[:12]
 	}
 
@@ -105,13 +107,23 @@ func (q *Query) GetPodByContainerId(clusterID string, containerId string) (*Pod,
 }
 
 func (q *Query) GetPodByNSAndName(clusterID string, namespace string, name string) (*Pod, bool) {
-	// TODO
+	if len(namespace) == 0 || len(name) == 0 {
+		return nil, false
+	}
+	if handler, find := q.GetCache(clusterID, resource.PodType); find {
+		podRef, find := handler.(*PodList).PodMap.Load(namespace + "/" + name)
+		return podRef.(*Pod), find
+	}
+
 	return nil, false
 }
 
 func (q *Query) GetPodByUID(clusterID string, UID resource.ResUID) (*Pod, bool) {
+	if len(UID) == 0 {
+		return nil, false
+	}
 	if handler, find := q.GetCache(clusterID, resource.PodType); find {
-		podRef, find := handler.(*PodList).PodMap.Load(UID)
+		podRef, find := handler.(*PodList).UIDMap.Load(UID)
 		return podRef.(*Pod), find
 	}
 
@@ -168,6 +180,9 @@ func (q *Query) ListPod(clusterID string) (pods []*Pod) {
 }
 
 func (q *Query) GetServiceByIP(clusterID string, serviceIP string) (*Service, bool) {
+	if len(serviceIP) == 0 {
+		return nil, false
+	}
 	if len(clusterID) == 0 {
 		handlers, find := q.GetCaches(resource.ServiceType)
 		if !find {
@@ -189,6 +204,9 @@ func (q *Query) GetServiceByIP(clusterID string, serviceIP string) (*Service, bo
 }
 
 func (q *Query) GetPodByIP(clusterID string, podIP string) (*Pod, bool) {
+	if len(podIP) == 0 {
+		return nil, false
+	}
 	if len(clusterID) == 0 {
 		handlers, find := q.GetCaches(resource.PodType)
 		if !find {
@@ -209,6 +227,9 @@ func (q *Query) GetPodByIP(clusterID string, podIP string) (*Pod, bool) {
 }
 
 func (q *Query) GetNodeByIP(clusterID string, IP string) (*Node, bool) {
+	if len(IP) == 0 {
+		return nil, false
+	}
 	if len(clusterID) == 0 {
 		handlers, find := q.GetCaches(resource.NodeType)
 		if !find {
