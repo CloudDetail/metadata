@@ -58,12 +58,14 @@ func (sl *ServiceList) Reset(resList []*resource.Resource) {
 
 	newServiceMap := sync.Map{}
 	newIP2ServiceMap := sync.Map{}
+	newUIDMap := sync.Map{}
 
 	for _, res := range resList {
 		service := &Service{Resource: res}
 		// 更新Service索引
 		newServiceMap.Store(service.NS()+"/"+service.Name, service)
 		newIP2ServiceMap.Store(service.IP(), service)
+		newUIDMap.Store(service.UID(), service)
 		// 接受Reset事件必然不是meta-agent, 不做 Pod/Service关系的处理
 	}
 
@@ -71,6 +73,7 @@ func (sl *ServiceList) Reset(resList []*resource.Resource) {
 	// newxxxMap必须只在当前线程内使用 才是线程安全的
 	sl.ServiceMap = newServiceMap
 	sl.IP2ServiceMap = newIP2ServiceMap
+	sl.UIDMap = newUIDMap
 	sl.Resources.Reset(resList)
 }
 
