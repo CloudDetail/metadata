@@ -47,6 +47,7 @@ func (rs *Resources) updateResList(res *Resource) (isUpdated bool) {
 			item.Relations = res.Relations
 			item.StringAttr = res.StringAttr
 			item.Int64Attr = res.Int64Attr
+			item.ExtraAttr = res.ExtraAttr
 			return true
 		}
 	}

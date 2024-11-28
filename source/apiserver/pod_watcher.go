@@ -2,6 +2,7 @@ package apiserver
 
 import (
 	"context"
+	"strconv"
 	"strings"
 
 	"github.com/CloudDetail/metadata/model/resource"
@@ -69,6 +70,12 @@ func (w *PodWatcher) Run() {
 }
 
 func createResourceFromPod(pod *corev1.Pod) *resource.Resource {
+	name2port := make(map[string]string)
+	for _, c := range pod.Spec.Containers {
+		for _, p := range c.Ports {
+			name2port[p.Name] = strconv.Itoa(int(p.ContainerPort))
+		}
+	}
 	return &resource.Resource{
 		ResUID:     resource.ResUID(pod.ObjectMeta.UID),
 		ResType:    resource.PodType,
@@ -88,6 +95,7 @@ func createResourceFromPod(pod *corev1.Pod) *resource.Resource {
 		},
 		ExtraAttr: map[resource.AttrKey]map[string]string{
 			resource.PodLabelsAttr: pod.Labels,
+			resource.Name2Port:     name2port,
 		},
 	}
 }
