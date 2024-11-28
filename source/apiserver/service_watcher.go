@@ -2,6 +2,7 @@ package apiserver
 
 import (
 	"context"
+	"strconv"
 
 	"github.com/CloudDetail/metadata/model/resource"
 	corev1 "k8s.io/api/core/v1"
@@ -69,6 +70,11 @@ func (w *ServiceWatcher) Run() {
 }
 
 func (*ServiceWatcher) createResourceFromService(eService *corev1.Service) *resource.Resource {
+	svc2target := make(map[string]string)
+	for _, port := range eService.Spec.Ports {
+		svc2target[strconv.Itoa(int(port.Port))] = port.TargetPort.String()
+	}
+
 	res := &resource.Resource{
 		ResUID:     resource.ResUID(eService.UID),
 		ResType:    resource.ServiceType,
@@ -81,7 +87,8 @@ func (*ServiceWatcher) createResourceFromService(eService *corev1.Service) *reso
 		},
 		Int64Attr: map[resource.AttrKey]int64{},
 		ExtraAttr: map[resource.AttrKey]map[string]string{
-			resource.ServiceSelectorsAttr: eService.Spec.Selector,
+			resource.ServiceSelectorsAttr:     eService.Spec.Selector,
+			resource.ServicePorts2TargetPorts: svc2target,
 		},
 	}
 	return res

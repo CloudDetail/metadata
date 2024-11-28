@@ -1,6 +1,7 @@
 package cache
 
 import (
+	"strconv"
 	"strings"
 	"sync"
 
@@ -352,6 +353,21 @@ func (s *Service) EndPoints() []string {
 	return strings.Split(endpoints, ",")
 }
 
+func (s *Service) SvcPorts() map[uint16]uint16 {
+	res := make(map[uint16]uint16)
+	for svc, target := range s.ExtraAttr[resource.ServicePorts2TargetPorts] {
+		svcPort, _ := strconv.Atoi(svc)
+		targetPort, _ := strconv.Atoi(target)
+		res[uint16(svcPort)] = uint16(targetPort)
+	}
+	return res
+}
+
+func isNum(s string) bool {
+	_, err := strconv.ParseInt(s, 10, 64)
+	return err == nil
+}
+
 func (s *Service) AddEndpoint(pod *Pod) {
 	// 不重复添加
 	for _, relation := range s.Relations {
@@ -368,6 +384,17 @@ func (s *Service) AddEndpoint(pod *Pod) {
 		},
 	})
 	s.StringAttr[resource.ServiceEndpoints] = strings.Join(s.endPoints, ",")
+
+	name2port := pod.ExtraAttr[resource.Name2Port]
+	svc2port := s.ExtraAttr[resource.ServicePorts2TargetPorts]
+	for k, v := range svc2port {
+		if !isNum(v) {
+			if port, ok := name2port[v]; ok {
+				svc2port[k] = port
+			}
+		}
+	}
+	s.ExtraAttr[resource.ServicePorts2TargetPorts] = svc2port
 }
 
 func (s *Service) DeleteEndpoint(oldPod *Pod) {

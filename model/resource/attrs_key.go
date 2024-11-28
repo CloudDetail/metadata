@@ -14,6 +14,7 @@ const (
 	PodHostName      AttrKey = 0x0014 // string
 	PodHostIP        AttrKey = 0x0015 // string
 	PodHostNetwork   AttrKey = 0x0016 // bool
+	Name2Port        AttrKey = 0x0017 // extra map[string]string
 
 	// K8sService
 	ServiceSelectorsAttr     AttrKey = 0x0020 // extra map[string]string
