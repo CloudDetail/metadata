@@ -111,17 +111,23 @@ func getContainerIDs(pod *corev1.Pod) string {
 	var str strings.Builder
 	var hasBefore bool
 	for _, containerStatus := range pod.Status.ContainerStatuses {
-		// "containerd://286b025a9464cb948a3f388df8a6700895fab34ff01d4770d308c6ae00508c8d"
-		if len(containerStatus.ContainerID) > 25 {
-			if hasBefore {
-				str.WriteByte(',')
-			} else {
-				hasBefore = true
-			}
-			str.WriteString(containerStatus.ContainerID[13:25])
+		if hasBefore {
+			str.WriteByte(',')
+		} else {
+			hasBefore = true
 		}
+		str.WriteString(cutContainerId(containerStatus.ContainerID))
 	}
 	return str.String()
+}
+
+func cutContainerId(containerIdStatus string) string {
+	containerIdStatus, _ = strings.CutPrefix(containerIdStatus, "containerd://")
+	containerIdStatus, _ = strings.CutPrefix(containerIdStatus, "docker://")
+	if len(containerIdStatus) > 12 {
+		containerIdStatus = containerIdStatus[:12]
+	}
+	return containerIdStatus
 }
 
 func getOwnerRef(pod *corev1.Pod) []resource.Relation {
