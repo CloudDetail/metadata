@@ -2,6 +2,7 @@ package apiserver
 
 import (
 	"context"
+	"regexp"
 	"strconv"
 	"strings"
 
@@ -121,13 +122,25 @@ func getContainerIDs(pod *corev1.Pod) string {
 	return str.String()
 }
 
+// containerd://xxxx
+// docker://xxxx
+// cri-o://xxxx
+var containerdPrefix = regexp.MustCompile("://(.*)")
+
 func cutContainerId(containerIdStatus string) string {
-	containerIdStatus, _ = strings.CutPrefix(containerIdStatus, "containerd://")
-	containerIdStatus, _ = strings.CutPrefix(containerIdStatus, "docker://")
-	if len(containerIdStatus) > 12 {
-		containerIdStatus = containerIdStatus[:12]
+	var containerID string
+	containerIDs := containerdPrefix.FindStringSubmatch(containerIdStatus)
+	if len(containerIDs) == 0 {
+		containerID = containerIdStatus
+	} else {
+		containerID = containerIDs[1]
 	}
-	return containerIdStatus
+	// containerIdStatus, _ = strings.CutPrefix(containerIdStatus, "containerd://")
+	// containerIdStatus, _ = strings.CutPrefix(containerIdStatus, "docker://")
+	if len(containerID) > 12 {
+		containerID = containerID[:12]
+	}
+	return containerID
 }
 
 func getOwnerRef(pod *corev1.Pod) []resource.Relation {
